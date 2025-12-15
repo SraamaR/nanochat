@@ -1,3 +1,5 @@
+models/
+.cache/
 .venv/
 __pycache__/
 *.pyc
