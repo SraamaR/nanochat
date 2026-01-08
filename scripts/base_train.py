@@ -37,6 +37,7 @@ parser = argparse.ArgumentParser(description="Pretrain base model")
 parser.add_argument("--run", type=str, default="dummy", help="wandb run name ('dummy' disables wandb logging)")
 # Runtime
 parser.add_argument("--device_type", type=str, default="", help="cuda|cpu|mps (empty = autodetect)")
+parser.add_argument("--dtype", type=str, default="bf16", choices=["bf16", "fp16", "fp32"], help="precision: bf16|fp16|fp32")
 # Model architecture
 parser.add_argument("--depth", type=int, default=20, help="depth of the Transformer model")
 parser.add_argument("--aspect_ratio", type=int, default=64, help="model_dim = depth * aspect_ratio")
@@ -76,9 +77,25 @@ user_config = vars(args).copy()  # for logging
 device_type = autodetect_device_type() if args.device_type == "" else args.device_type
 ddp, ddp_rank, ddp_local_rank, ddp_world_size, device = compute_init(device_type)
 master_process = ddp_rank == 0 # this process will do logging, checkpointing etc.
-autocast_ctx = torch.amp.autocast(device_type=device_type, dtype=torch.bfloat16) if device_type == "cuda" else nullcontext()
+if device_type == "cuda":
+    if args.dtype == "bf16":
+        autocast_ctx = torch.amp.autocast(device_type=device_type, dtype=torch.bfloat16)
+        model_dtype = torch.bfloat16
+    elif args.dtype == "fp16":
+        autocast_ctx = torch.amp.autocast(device_type=device_type, dtype=torch.float16)
+        model_dtype = torch.float32 # For FP16 mixed precision, weights should be FP32 for stability
+    else: # fp32
+        autocast_ctx = nullcontext()
+        model_dtype = torch.float32
+else:
+    autocast_ctx = nullcontext()
+    model_dtype = torch.float32
 synchronize = torch.cuda.synchronize if device_type == "cuda" else lambda: None
 get_max_memory = torch.cuda.max_memory_allocated if device_type == "cuda" else lambda: 0
+
+# Init the GradScaler for fp16 training
+use_scaler = (args.dtype == "fp16")
+scaler = torch.cuda.amp.GradScaler(enabled=use_scaler)
 
 # wandb logging init
 use_dummy_wandb = args.run == "dummy" or not master_process
@@ -139,7 +156,7 @@ with torch.device("meta"):
     model_config = GPTConfig(**model_config_kwargs)
     model = GPT(model_config)
 model.to_empty(device=device) # All tensors get storage on target device but with uninitialized (garbage) data
-model.init_weights() # All tensors get initialized
+model.init_weights(dtype=model_dtype) # All tensors get initialized
 
 # If we are resuming, overwrite the model parameters with those of the checkpoint
 base_dir = get_base_dir()
@@ -343,7 +360,7 @@ while True:
             loss = model(x, y)
         train_loss = loss.detach() # for logging
         loss = loss / grad_accum_steps # each .backward() is a grad sum => normalize loss here
-        loss.backward()
+        scaler.scale(loss).backward()
         x, y, dataloader_state_dict = next(train_loader) # prefetch the next batch while the GPU is busy with forward/backward
     # step the optimizers
     lrm = get_lr_multiplier(step)
@@ -353,8 +370,15 @@ while True:
     muon_momentum = get_muon_momentum(step)
     for group in muon_optimizer.param_groups:
         group["momentum"] = muon_momentum
+    
+    # We need to unscale the gradients before the step for both optimizers
+    # This is slightly tricky because we have multiple optimizers
+    # The standard scaler.step(opt) unscales the gradients of the opt, checks for infs, and then steps
+    # We'll use the scaler to step each optimizer
     for opt in optimizers:
-        opt.step()
+        scaler.step(opt)
+    scaler.update()
+    
     model.zero_grad(set_to_none=True)
     synchronize()
     t1 = time.time()

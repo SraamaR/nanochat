@@ -5,7 +5,7 @@
 export OMP_NUM_THREADS=1
 
 # For running on unsupported RDNA2 GPUs like gfx1035
-#export HSA_OVERRIDE_GFX_VERSION=10.3.0
+export HSA_OVERRIDE_GFX_VERSION=10.3.0
 
 # Intermediate artifacts directory is in ./.cache
 export NANOCHAT_BASE_DIR="$(pwd)/.cache"
@@ -63,6 +63,7 @@ python -m scripts.base_train \
     --core_metric_max_per_task=12 \
     --sample_every=100 \
     --num_iterations=1000 \
+    --dtype=fp16 \
     --run=$WANDB_RUN
 python -m scripts.base_loss --device_batch_size=1 --split_tokens=4096
 python -m scripts.base_eval --max-per-task=16
