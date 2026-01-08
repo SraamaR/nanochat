@@ -13,9 +13,3 @@ eval_bundle/
 .claude
 CLAUDE.md
 wandb/
-
-# Local experimentation
-experiments/
-ignore/
-knowledge/
-ideas/
