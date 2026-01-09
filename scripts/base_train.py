@@ -95,7 +95,7 @@ get_max_memory = torch.cuda.max_memory_allocated if device_type == "cuda" else l
 
 # Init the GradScaler for fp16 training
 use_scaler = (args.dtype == "fp16")
-scaler = torch.cuda.amp.GradScaler(enabled=use_scaler)
+scaler = torch.amp.GradScaler("cuda", enabled=use_scaler)
 
 # wandb logging init
 use_dummy_wandb = args.run == "dummy" or not master_process
