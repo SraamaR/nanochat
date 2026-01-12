@@ -4,6 +4,82 @@ A running summary documenting some experiments and findings. Started ~Jan 7 2026
 
 ---
 
+
+## 2026-01-12: Multi-Token Prediction (MTP)
+
+Ported multi-token prediction from modded-nanogpt. Instead of predicting just the next token, predict the next n tokens at each position with weighted loss.
+
+### Implementation
+
+- Instead of calling the loss `n_predict` times, uses a fancy batched computation using `unfold` + `gather` + cross-entropy decomposition (`CE = logsumexp - logits[target]`)
+- Schedule anneals from 3-token to 1-token prediction:
+  - 0-33%: `[1.0, 0.5, 0.25→0]` (3rd token fades)
+  - 33-67%: `[1.0, 0.5→0]` (2nd token fades)
+  - 67-100%: `[1.0]` (standard next-token)
+- Weights normalized to sum to 1
+
+### Results (d12)
+
+| Metric | Baseline | MTP |
+|--------|----------|-----|
+| GPU Memory | 34 GB | 47 GB |
+| MFU | 41% | 40% |
+| val/bpb (per step) | baseline | same/slightly worse |
+| val/bpb (wall clock) | baseline | noticeably worse |
+
+**Conclusion:** Negative result for nanochat. The extra memory and compute overhead from predicting multiple tokens doesn't pay off, in fact the results get worse. The auxiliary loss signal may help in other settings (larger models, different architectures?), but for our setup it's pure overhead at the moment.
+
+---
+
+## 2026-01-11: Sliding Window Attention
+
+Added configurable sliding window attention, inspired by GPT-3's alternating short/long pattern.
+
+**Pattern string configuration:**
+- New `--window_pattern` CLI arg and `GPTConfig.window_pattern` field
+- Pattern is tiled across layers (e.g., `SSSL` for 20 layers → `SSSLSSSLSSSLSSSLSSSL`)
+- Final layer always forced to L (full context) regardless of pattern
+- Short window = `sequence_len // 2`
+- Long window = `sequence_len` (full context)
+- All previous models so far have been simply `L` and checkpoint loading is modified accordingly to fill in this param for old models, see `_patch_missing_config_keys`
+
+Quick experiments showed `SSSL` (every 4th layer is long) works well - provides a good balance between compute savings and model quality. This is now the default.
+
+---
+
+## 2026-01-11: Flash Attention 3 Integration
+
+Replaced PyTorch's `scaled_dot_product_attention` (FA2) with Flash Attention 3 for training and inference.
+
+### Changes Made
+
+**1. FA3 via `kernels` package**
+- Official FA3 is "beta" and requires building from source (painful)
+- Using `kernels` package from HuggingFace Hub: `get_kernel('varunneal/flash-attention-3')`
+- Loads pre-built wheels, works out of the box on H100
+
+**2. Simplified attention code**
+- FA3 uses `(B, T, H, D)` layout matching our projection output directly - no transpose needed
+- Training: `flash_attn.flash_attn_func(q, k, v, causal=True)`
+- Inference: `flash_attn.flash_attn_with_kvcache()` handles all cache cases in one call
+- Removed 3 separate FA2 code paths (training, single-token, chunk inference)
+- GQA handled automatically when n_kv_heads < n_heads
+
+**3. Rewrote KVCache for FA3**
+- Old format: `(num_layers, 2, B, H, T, D)` combined tensor
+- New format: separate `k_cache` and `v_cache` of shape `(num_layers, B, T, H, D)`
+- FA3 updates cache in-place during `flash_attn_with_kvcache`
+- Position tracked via `cache_seqlens` tensor (int32, per batch element)
+- Simpler API: `get_layer_cache()`, `advance()`, `reset()`, `prefill()`
+
+### Results
+
+- **~9% improvement in tok/sec** during training out of the box
+- Benchmarks showed FA3 is 2x faster than FA2 at realistic training sizes (batch=32, seq=2048)
+- FA3 supports sliding window via `window_size=(left, 0)`, which is huge and expected to give further improvements. This is ready to tune but keeping full context for now.
+
+---
+
 ## 2026-01-11: Per-Layer Residual Scalars (x0 & resid lambdas)
 
 Cherry-picked an idea from modded-nanogpt around learnable per-layer residual connections.
