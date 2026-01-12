@@ -7,6 +7,9 @@ export OMP_NUM_THREADS=1
 # For running on unsupported RDNA2 GPUs like gfx1035
 export HSA_OVERRIDE_GFX_VERSION=10.3.0
 
+# Workaround for PyTorch download
+# export TMPDIR=/home/user/Documents/Projets/nanochat/.tmp
+
 # Intermediate artifacts directory is in ./.cache
 export NANOCHAT_BASE_DIR="$(pwd)/.cache"
 mkdir -p $NANOCHAT_BASE_DIR
@@ -15,7 +18,7 @@ mkdir -p $NANOCHAT_BASE_DIR
 # Python venv setup
 
 # create a .venv local virtual environment (if it doesn't exist)
-[ -d ".venv" ] || python3 -m venv .venv --system-site-packages
+[ -d ".venv" ] || python3 -m venv .venv
 
 # activate venv so that `python` uses the project's venv instead of system python
 source .venv/bin/activate

@@ -9,7 +9,8 @@ rustbpe>=0.1.0
 setuptools>=80.9.0
 tiktoken>=0.11.0
 tokenizers>=0.22.0
-torch>=2.9.0
+torch==2.10.0
+--extra-index-url https://download.pytorch.org/whl/test/rocm7.1
 transformers>=4.57.3
 uvicorn>=0.36.0
 wandb>=0.21.3
