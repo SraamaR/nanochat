@@ -66,6 +66,7 @@ python -m scripts.base_train \
     --sample_every=200 \
     --num_iterations=2400 \
     --dtype=fp16 \
+    --weight_decay=0.71 \
     --run=$WANDB_RUN
 python -m scripts.base_loss --device_batch_size=1 --split_tokens=524288
 python -m scripts.base_eval --max-per-task=16
