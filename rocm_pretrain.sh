@@ -49,7 +49,7 @@ python -m nanochat.report reset
 
 # Each shard is ~250M chars so ~52M tokens
 python -m nanochat.dataset -n 16
-python -m scripts.tok_train --max_chars=2000000000 --vocab_size=32768
+python -m scripts.tok_train --max-chars=2000000000 --vocab-size=32768
 python -m scripts.tok_eval
 
 # Number of processes/GPUs to use
@@ -57,27 +57,27 @@ NPROC_PER_NODE=1
 
 python -m scripts.base_train \
     --depth=6 \
-    --device_batch_size=1 \
-    --total_batch_size=131072 \
-    --eval_every=50 \
-    --eval_tokens=524288 \
-    --core_metric_every=-1 \
-    --core_metric_max_per_task=12 \
-    --sample_every=200 \
-    --num_iterations=2400 \
+    --device-batch-size=1 \
+    --total-batch-size=131072 \
+    --eval-every=50 \
+    --eval-tokens=524288 \
+    --core-metric-every=-1 \
+    --core-metric-max-per-task=12 \
+    --sample-every=200 \
+    --num-iterations=2400 \
     --dtype=fp16 \
     --run=$WANDB_RUN
-python -m scripts.base_loss --device_batch_size=1 --split_tokens=524288
+python -m scripts.base_loss --device-batch-size=1 --split-tokens=524288
 python -m scripts.base_eval --max-per-task=16
 
 # midtraining
 #python -m scripts.mid_train \
-#    --max_seq_len=1024 \
-#    --device_batch_size=1 \
-#    --eval_every=50 \
-#    --eval_tokens=4096 \
-#    --total_batch_size=1024 \
-#    --num_iterations=100
+#    --max-seq-len=1024 \
+#    --device-batch-size=1 \
+#    --eval-every=50 \
+#    --eval-tokens=4096 \
+#    --total-batch-size=1024 \
+#    --num-iterations=100
 
 # eval results will be terrible, this is just to execute the code paths.
 # note that we lower the execution memory limit to 1MB to avoid warnings on smaller systems
@@ -85,11 +85,11 @@ python -m scripts.base_eval --max-per-task=16
 
 # SFT
 #python -m scripts.chat_sft \
-#    --device_batch_size=1 \
-#    --target_examples_per_step=4 \
-#    --num_iterations=100 \
-#    --eval_steps=4 \
-#    --eval_metrics_max_problems=16
+#    --device-batch-size=1 \
+#    --target-examples-per-step=4 \
+#    --num-iterations=100 \
+#    --eval-steps=4 \
+#    --eval-metrics-max-problems=16
 
 # Chat CLI
 # python -m scripts.chat_cli -p "Why is the sky blue?"
