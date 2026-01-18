@@ -5,7 +5,7 @@
 export OMP_NUM_THREADS=1
 
 # For running on unsupported RDNA2 GPUs like gfx1035
-#export HSA_OVERRIDE_GFX_VERSION=10.3.0
+export HSA_OVERRIDE_GFX_VERSION=10.3.0
 
 # Workaround for PyTorch download
 #mkdir $(pwd)/.tmp
@@ -58,27 +58,29 @@ NPROC_PER_NODE=1
 
 python -m scripts.base_train \
     --depth=6 \
+    --head-dim=64 \
+    --window-pattern=L \
+    --max-seq-len=512 \
     --device-batch-size=1 \
-    --total-batch-size=131072 \
-    --eval-every=50 \
+    --total-batch-size=16384 \
+    --eval-every=100 \
     --eval-tokens=524288 \
     --core-metric-every=-1 \
-    --core-metric-max-per-task=12 \
-    --sample-every=200 \
-    --num-iterations=2400 \
-    --window-pattern L \
+    --sample-every=100 \
+    --num-iterations=5000 \
     --run=$WANDB_RUN
-python -m scripts.base_loss --device-batch-size=1 --split-tokens=524288
+python -m scripts.base_loss --device-batch-size=1 --split-tokens=16384
 python -m scripts.base_eval --max-per-task=16
 
 # midtraining
 #python -m scripts.mid_train \
-#    --max-seq-len=1024 \
-#    --device-batch-size=1 \
-#    --eval-every=50 \
-#    --eval-tokens=4096 \
-#    --total-batch-size=1024 \
-#    --num-iterations=100
+#    --max-seq-len=512 \
+#    --device-batch-size=32 \
+#    --total-batch-size=16384 \
+#    --eval-every=200 \
+#    --eval-tokens=524288 \
+#    --num-iterations=1500 \
+#    --run=$WANDB_RUN
 
 # eval results will be terrible, this is just to execute the code paths.
 # note that we lower the execution memory limit to 1MB to avoid warnings on smaller systems
@@ -93,9 +95,9 @@ python -m scripts.base_eval --max-per-task=16
 #    --eval-metrics-max-problems=16
 
 # Chat CLI
-# python -m scripts.chat_cli -p "Why is the sky blue?"
+# python -m scripts.chat_cli -i mid -p "What is the capital of France?"
 
 # Chat Web
-# python -m scripts.chat_web
+# python -m scripts.chat_web -i mid
 
 python -m nanochat.report generate
