@@ -4,7 +4,6 @@ __pycache__/
 dev-ignore/
 report.md
 eval_bundle/
-.tmp/
 .cache/
 
 # Secrets
