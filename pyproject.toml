@@ -57,7 +57,7 @@ explicit = true
 # (rocm[libraries], pytorch-triton-rocm, etc.) resolve from it too
 [[tool.uv.index]]
 name = "therock-amd"
-url  = "https://rocm.nightlies.amd.com/v2/gfx120X-all/"
+url  = "https://rocm.nightlies.amd.com/v2-staging/gfx103X-dgpu/"
 
 [project.optional-dependencies]
 cpu = [
