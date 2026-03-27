@@ -9,7 +9,6 @@ export NANOCHAT_BASE_DIR="$(pwd)/.cache"
 mkdir -p $NANOCHAT_BASE_DIR
 
 export NANOCHAT_DTYPE=float16
-export TORCH_COMPILE_DISABLE=1
 
 # -----------------------------------------------------------------------------
 # Python venv setup with uv
