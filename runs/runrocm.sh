@@ -1,7 +1,14 @@
 #!/bin/bash
 
 # For running on unsupported RDNA2 GPUs like gfx1035
-# export HSA_OVERRIDE_GFX_VERSION=10.3.0
+#export HSA_OVERRIDE_GFX_VERSION=10.3.0
+#export NANOCHAT_DTYPE=bfloat16
+
+# Env vars to collect ops used
+#export PYTORCH_TUNABLEOP_ENABLED=1
+#export PYTORCH_TUNABLEOP_TUNING=0           # collect only, don't tune yet
+#export PYTORCH_TUNABLEOP_RECORD_UNTUNED=1   # write untuned ops to CSV
+#export PYTORCH_TUNABLEOP_VERBOSE=2          # show progress
 
 # Default intermediate artifacts directory is in ~/.cache/nanochat
 export OMP_NUM_THREADS=1
@@ -9,7 +16,7 @@ export NANOCHAT_BASE_DIR="$(pwd)/.cache"
 mkdir -p $NANOCHAT_BASE_DIR
 
 export TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1
-#export NANOCHAT_DTYPE=bfloat16
+
 
 # -----------------------------------------------------------------------------
 # Python venv setup with uv
@@ -46,7 +53,7 @@ python -m nanochat.report reset
 
 # Download dataset
 # Each shard is ~250M chars so ~52M tokens
-python -m nanochat.dataset -n 20
+python -m nanochat.dataset -n 50
 
 # train the tokenizer with vocab size 2**15 = 32768 on ~2B characters of data
 python -m scripts.tok_train
@@ -60,14 +67,15 @@ python -m scripts.base_train \
     --depth=8 \
     --window-pattern=L \
     --device-batch-size=8 \
-    --total-batch-size=65536 \
+    --total-batch-size=131072 \
     --eval-every=100 \
     --eval-tokens=524288 \
     --core-metric-every=-1 \
     --sample-every=500 \
-    --num-iterations=5000 \
+    --num-iterations=3000 \
+    --fp8 \
     --run=$WANDB_RUN
-python -m scripts.base_eval --device-batch-size=32 --split-tokens=16384 --max-per-task=16
+python -m scripts.base_eval --device-batch-size=8 --split-tokens=524288 --max-per-task=200
 
 
 # -----------------------------------------------------------------------------
@@ -79,9 +87,8 @@ python -m scripts.base_eval --device-batch-size=32 --split-tokens=16384 --max-pe
 
 # run SFT and eval the model
 #python -m scripts.chat_sft \
-#    --max-seq-len=512 \
-#    --device-batch-size=1 \
-#    --total-batch-size=16384 \
+#    --device-batch-size=8 \
+#    --total-batch-size=131072 \
 #    --eval-every=200 \
 #    --eval-tokens=524288 \
 #    --num-iterations=1500 \
