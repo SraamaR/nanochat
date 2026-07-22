@@ -12,7 +12,7 @@ dependencies = [
     "pyarrow>=21.0.0",
     "rustbpe>=0.1.0",
     "tiktoken>=0.11.0",
-    "torch==2.9.1",
+    "torch>=2.9.1",
     "wandb>=0.21.3",
 ]
 
@@ -38,6 +38,7 @@ python_functions = ["test_*"]
 torch = [
     { index = "pytorch-cpu", extra = "cpu" },
     { index = "pytorch-cu128", extra = "gpu" },
+    { index = "therock-amd",  extra = "rocm" },
 ]
 
 [[tool.uv.index]]
@@ -50,13 +51,20 @@ name = "pytorch-cu128"
 url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
+[[tool.uv.index]]
+name = "therock-amd"
+url  = "https://rocm.nightlies.amd.com/whl-multi-arch/"
+
 [project.optional-dependencies]
 cpu = [
     "setuptools>=65.0.0",
-    "torch==2.9.1",
+    "torch>=2.9.1",
 ]
 gpu = [
-    "torch==2.9.1",
+    "torch>=2.9.1",
+]
+rocm = [
+    "torch[device-gfx1200]>=2.9.1", # For RX 9060 XT
 ]
 
 [tool.uv]
@@ -65,5 +73,9 @@ conflicts = [
     [
         { extra = "cpu" },
         { extra = "gpu" },
+        { extra = "rocm" },
     ],
+]
+required-environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]

@@ -1,0 +1,95 @@
+#!/bin/bash
+
+# Env vars to collect ops used
+# export PYTORCH_TUNABLEOP_ENABLED=1
+# export PYTORCH_TUNABLEOP_TUNING=0           # collect only, don't tune yet
+# export PYTORCH_TUNABLEOP_RECORD_UNTUNED=1   # write untuned ops to CSV
+# export PYTORCH_TUNABLEOP_VERBOSE=2          # show progress
+
+# Default intermediate artifacts directory is in ~/.cache/nanochat
+export OMP_NUM_THREADS=1
+export NANOCHAT_BASE_DIR="$(pwd)/.cache"
+mkdir -p $NANOCHAT_BASE_DIR
+
+export TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1
+
+
+# -----------------------------------------------------------------------------
+# Python venv setup with uv
+
+# install uv (if not already installed)
+command -v uv &> /dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
+# create a .venv local virtual environment (if it doesn't exist)
+[ -d ".venv" ] || uv venv
+# install the repo dependencies
+uv sync --extra rocm
+# activate venv so that `python` uses the project's venv instead of system python
+source .venv/bin/activate
+
+# -----------------------------------------------------------------------------
+# wandb setup
+# If you wish to use wandb for logging (it's nice!, recommended).
+# 1) Make sure to first log in to wandb, e.g. run:
+#    `wandb login`
+# 2) Set the WANDB_RUN environment variable when running this script, e.g.:
+#    `WANDB_RUN=d6 bash rocm_pretrain.sh`
+if [ -z "$WANDB_RUN" ]; then
+    # by default use "dummy" : it's handled as a special case, skips logging to wandb
+    WANDB_RUN=dummy
+fi
+
+# -----------------------------------------------------------------------------
+# Tokenizer
+
+# Download dataset
+# Each shard is ~250M chars so ~52M tokens
+python -m nanochat.dataset -n 50
+
+# train the tokenizer with vocab size 2**15 = 32768 on ~2B characters of data
+ python -m scripts.tok_train
+# evaluate the tokenizer (report compression ratio etc.)
+python -m scripts.tok_eval
+
+# -----------------------------------------------------------------------------
+# Base model (pretraining)
+
+python -m scripts.base_train \
+    --depth=12 \
+    --window-pattern=L \
+    --device-batch-size=8 \
+    --total-batch-size=262144 \
+    --eval-every=100 \
+    --eval-tokens=524288 \
+    --core-metric-every=-1 \
+    --sample-every=500 \
+    --num-iterations=4000 \
+    --run=$WANDB_RUN
+python -m scripts.base_eval --device-batch-size=8 --split-tokens=524288 --max-per-task=200
+
+
+# -----------------------------------------------------------------------------
+# SFT (teach the model conversation special tokens, tool use, multiple choice)
+
+# download 2.3MB of synthetic identity conversations to impart a personality to nanochat
+# see dev/gen_synthetic_data.py for details on how this data was prepared and to get a sense of how you can easily tune it
+# curl -L -o $NANOCHAT_BASE_DIR/identity_conversations.jsonl https://karpathy-public.s3.us-west-2.amazonaws.com/identity_conversations.jsonl
+
+# run SFT and eval the model
+# python -m scripts.chat_sft \
+#    --device-batch-size=8 \
+#    --total-batch-size=262144 \
+#    --eval-every=-1 \
+#    --eval-tokens=524288 \
+#    --chatcore-every=-1 \
+#    --num-iterations=-1 \
+#    --mmlu-epochs=1 \
+#    --gsm8k-epochs=4 \
+#    --run=$WANDB_RUN
+
+# python -m scripts.chat_eval -i sft --task-name "ARC-Easy|ARC-Challenge|MMLU"
+
+# chat with the model over CLI! Leave out the -p to chat interactively
+# python -m scripts.chat_cli -p "Why is the sky blue?"
+
+# even better, chat with your model over a pretty WebUI ChatGPT style
+# python -m scripts.chat_web
