@@ -3,7 +3,7 @@ name = "nanochat"
 version = "0.1.0"
 description = "the minimal full-stack ChatGPT clone"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "filelock>=3.19.0",
     "kernels>=0.11.7",
@@ -38,8 +38,11 @@ python_functions = ["test_*"]
 torch = [
     { index = "pytorch-cpu", extra = "cpu" },
     { index = "pytorch-cu128", extra = "gpu" },
-    { index = "therock-amd",  extra = "rocm" },
+    { index = "therock-amd", extra = "rocm" },
+    { index = "therock-amd", extra = "rocm-gfx1035" },
 ]
+# CUDA needs upstream Triton; AMD's builds supply their own version.
+triton = [{ index = "pypi", extra = "gpu" }]
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
@@ -53,7 +56,12 @@ explicit = true
 
 [[tool.uv.index]]
 name = "therock-amd"
-url  = "https://rocm.nightlies.amd.com/whl-multi-arch/"
+url = "https://stable.repo.amd.com/rocm/whl-next/"
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+explicit = true
 
 [project.optional-dependencies]
 cpu = [
@@ -62,20 +70,26 @@ cpu = [
 ]
 gpu = [
     "torch>=2.9.1",
+    "triton; sys_platform == 'linux'",
 ]
 rocm = [
-    "torch[device-gfx1200]>=2.9.1", # For RX 9060 XT
+    "torch[device-gfx1200]>=2.14.0", # Radeon RX 9060 / XT
+]
+rocm-gfx1035 = [
+    "torch[device-gfx1035]>=2.14.0", # Radeon 680M
 ]
 
 [tool.uv]
 default-groups = []
+prerelease = "disallow"
+required-environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
 conflicts = [
     [
         { extra = "cpu" },
         { extra = "gpu" },
         { extra = "rocm" },
+        { extra = "rocm-gfx1035" },
     ],
-]
-required-environments = [
-    "sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]

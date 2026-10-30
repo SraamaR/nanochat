@@ -37,6 +37,18 @@ uv sync --extra cpu    # (or) Use for CPU-only / MPS
 source .venv/bin/activate
 ```
 
+For AMD GPUs, use `uv sync --extra rocm` for Radeon RX 9060 / XT (`gfx1200`, the default), or
+`uv sync --extra rocm-gfx1035` for Radeon 680M (`gfx1035`). These extras
+use [AMD's stable builds](https://github.com/ROCm/TheRock/blob/main/RELEASES.md)
+and install device packages only for the selected GPU.
+
+`bash runs/runrocm_test.sh` runs the small ROCm training and evaluation pipeline.
+It defaults to RX 9060 / XT. Use
+`ROCM_EXTRA=rocm-gfx1035 bash runs/runrocm_test.sh` for Radeon 680M.
+The same selector works with `runs/runrocm.sh` for the larger run. Both scripts
+check for newer stable PyTorch builds each time they run; plain `uv sync`
+uses the versions recorded in `uv.lock`.
+
 For development (adds pytest, matplotlib, ipykernel, transformers, etc.):
 
 ```bash

@@ -1,4 +1,5 @@
 #!/bin/bash
+set -eo pipefail
 
 # Env vars to collect ops used
 # export PYTORCH_TUNABLEOP_ENABLED=1
@@ -21,8 +22,9 @@ export TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1
 command -v uv &> /dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
 # create a .venv local virtual environment (if it doesn't exist)
 [ -d ".venv" ] || uv venv
-# install the repo dependencies
-uv sync --extra rocm
+# Check AMD's feed for newer stable PyTorch builds on every run.
+# Default: RX 9060 / XT (gfx1200). For Radeon 680M, set ROCM_EXTRA=rocm-gfx1035.
+uv sync --extra "${ROCM_EXTRA:-rocm}" --upgrade-package torch --refresh-package torch --prerelease disallow
 # activate venv so that `python` uses the project's venv instead of system python
 source .venv/bin/activate
 
